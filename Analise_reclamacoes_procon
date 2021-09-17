@@ -1,0 +1,171 @@
+# Processamento Inicial
+
+### Importa bibliotecas
+
+import nltk
+import pandas as pd
+import os
+import numpy as np
+import string
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from PIL import Image
+
+%matplotlib inline
+
+### Define o diretório de trabalho
+
+#workdir_path = '/mnt/5bdd0b49-a2cd-495d-a27b-f4810abd97ca/home/osias/Projects/'+\
+#'Processamento de linguagem natural/Trabalho BI 2019'
+#os.chdir(workdir_path)
+
+### Leitura da base de reclamações
+
+pwd
+
+data = pd.read_csv('base reclamações (2).csv',encoding='windows-1252',sep =';')
+# verificação visual das 5 primeiras linhas
+data.tail()
+
+### Quantidade de linhas e de colunas do dataframe lido
+
+data.shape
+
+data.query('estado=="RJ"')
+
+data.groupby("estado").size().sort_values(ascending=False)
+
+# Verificar as reclamações por estado
+
+data.groupby("estado").size().sort_values(ascending=False)[:].plot(figsize=(10,10),kind='bar')
+
+## Colunas da tabela
+
+data.columns
+
+new_columns = data.columns.values
+new_columns[0] = 'Regiao' 
+data.columns = new_columns
+
+### Localização das colunas com valores "null"
+
+data.isnull().sum()
+
+# Filtrar o Estado
+
+df_seleciona_estado = pd.DataFrame()
+df_seleciona_estado = data.query('estado == "SP" and Regiao =="Sudeste"')
+#df_seleciona_estado = data.query('estado != "XX"')
+
+data.count()
+
+
+df_seleciona_estado.count()
+
+# Tratamento das empresas
+
+### Separação da coluna das empresas
+
+df_seleciona_estado.count()
+
+df_empresa = pd.DataFrame()
+df_empresa['empresa'] = df_seleciona_estado['empresa']
+
+df_empresa['empresa']
+
+df_empresa['empresa'] = df_empresa['empresa'].apply(lambda x: x.replace(' S/A', ''))
+
+df_empresa['empresa'] = df_empresa['empresa'].apply(lambda x: x.replace(' LTDA', ''))
+
+df_empresa['empresa'] = df_empresa['empresa'].apply(lambda x: x.replace(' SA', ''))
+
+df_empresa['empresa'] = df_empresa['empresa'].apply(lambda x: x.replace(' sa', ''))
+
+df_empresa['empresa'] = df_empresa['empresa'].apply(lambda x: x.replace(' s/a', ''))
+
+df_empresa['empresa'] = df_empresa['empresa'].apply(lambda x: x.replace(' CEF', ''))
+
+df_empresa['empresa']
+
+### Verificação se há algum "null"
+
+df_empresa.isnull().sum()
+
+### Remoção dos "nulls" encontrados
+
+df_empresa.dropna(inplace=True)
+df_empresa.isnull().sum()
+
+### Substitui:
+
+#### " " por "_" (espaço)
+
+#### "/" por "" 
+
+#### "," por "" 
+
+#### "(" por "" 
+
+#### ")" por "" 
+
+#### "-" por ""
+
+#### "." por ""
+
+#### "\t" por "" (tab)
+
+### para o wordcloud funcionar
+
+#dicionario = {' ':'_','/':'',',':'','\(':'','\)':'',"-":'','\.':'',r"^\t":''}
+dicionario = {' ':'_','/':'',',':'','\(':'','\)':'',"-":'','\.':'',r"^\t":''}
+df_empresa["Nome Empresa Sem Espaço"] = df_empresa.replace({'empresa': dicionario},regex=True)
+
+### Converte o nome das empresas para letras minúsculas
+
+df_empresa["Nome Empresa Sem Espaço"] = df_empresa["Nome Empresa Sem Espaço"].str.lower()
+
+### Apreciação inicial do que foi obtido
+
+print (df_empresa.groupby("Nome Empresa Sem Espaço").size().sort_values(ascending=False))
+
+lista = pd.DataFrame()
+lista = df_empresa.groupby("Nome Empresa Sem Espaço").size().sort_values(ascending=False)
+
+type(lista)
+
+lista.to_csv('lista.csv')
+
+### Criação de uma string única com todas as ocorrências dos nomes das empresas
+
+string_empresas = " ".join([text for text in df_empresa["Nome Empresa Sem Espaço"]])
+
+### Geração do wordcloud das 40 empresas mais reclamadas
+
+Estado_mask = np.array(Image.open("/content/EstadoSP.jpeg"))
+
+wordcloud_empresas = WordCloud(background_color="white",collocations=False,
+                              #colormap="Oranges_r",
+                       #       colormap="RdYlGn",
+                              width = 4000,
+                              height = 3000,
+                              max_font_size=1000,
+                              max_words=40
+                               ,mask=Estado_mask
+                             ,contour_color='#5d0f24',
+                             contour_width=1
+                              ).generate(string_empresas)
+plt.figure(figsize = (20,15),
+           facecolor = 'k',
+           edgecolor = 'k')
+plt.imshow(wordcloud_empresas, interpolation='bilinear')
+plt.axis('off')
+plt.tight_layout(pad=0)
+plt.savefig("Empresa_wordcloud.png")
+plt.show()
+
+### Para ficar mais claro, é interessante um diagrama de barras ordenado pela quantidade decrescente de problemas, limitado aos 40 mais reclamados. 
+
+df_empresa.groupby("Nome Empresa Sem Espaço").size().sort_values(ascending=False)[:45].plot(figsize=(10,10),kind='bar')
